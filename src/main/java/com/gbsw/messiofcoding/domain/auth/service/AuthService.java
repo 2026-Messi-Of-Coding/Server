@@ -74,4 +74,11 @@ public class AuthService {
 
         return new LoginServiceResult(accessToken, refreshToken);
     }
+
+    @Transactional
+    public void logout(String refreshToken) {
+        if (refreshToken != null) {
+            refreshTokenRepository.deleteByToken(refreshToken);
+        }
+    }
 }

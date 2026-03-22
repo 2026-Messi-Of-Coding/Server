@@ -14,12 +14,12 @@ public class ApiResponse<T> {
     private T data;
     private String message;
 
-    public static <T> ApiResponse<T> success(T data) {
-        return new ApiResponse<>(true, data, HttpStatus.OK.name());
+    public static <T> ApiResponse<T> success(T data, String message) {
+        return new ApiResponse<>(true, data, message);
     }
 
-    public static <T> ApiResponse<T> success() {
-        return new ApiResponse<>(true, null, HttpStatus.OK.name());
+    public static <T> ApiResponse<T> success(T data) {
+        return new ApiResponse<>(true, data, HttpStatus.OK.name());
     }
 
     public static <T> ApiResponse<T> fail(String message) {
