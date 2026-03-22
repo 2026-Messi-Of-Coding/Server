@@ -24,24 +24,24 @@ public class JwtProvider {
     private final com.gbsw.messiofcoding.global.security.service.CustomUserDetailsService userDetailsService;
 
     private SecretKey getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(jwtProperties.getSecretKey());
+        byte[] keyBytes = Decoders.BASE64URL.decode(jwtProperties.getSecretKey());
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String generateAccessToken(String username) {
-        return generateToken(username, jwtProperties.getAccessTokenExpiration());
+    public String generateAccessToken(long userId) {
+        return generateToken(userId, jwtProperties.getAccessTokenExpiration());
     }
 
-    public String generateRefreshToken(String username) {
-        return generateToken(username, jwtProperties.getRefreshTokenExpiration());
+    public String generateRefreshToken(long userId) {
+        return generateToken(userId, jwtProperties.getRefreshTokenExpiration());
     }
 
-    private String generateToken(String username, long expiration) {
+    private String generateToken(long userId, long expiration) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);
 
         return Jwts.builder()
-                .subject(username)
+                .subject(String.valueOf(userId))
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(getSigningKey())
@@ -53,8 +53,8 @@ public class JwtProvider {
     }
 
     public Authentication getAuthentication(String token) {
-        String username = getUsernameFromToken(token);
-        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        String userId = getUsernameFromToken(token);
+        UserDetails userDetails = userDetailsService.loadUserByUsername(userId);
         return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
     }
 
