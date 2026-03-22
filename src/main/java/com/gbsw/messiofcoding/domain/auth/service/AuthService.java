@@ -3,6 +3,7 @@ package com.gbsw.messiofcoding.domain.auth.service;
 import com.gbsw.messiofcoding.domain.auth.dto.request.LoginRequest;
 import com.gbsw.messiofcoding.domain.auth.dto.request.RegisterRequest;
 import com.gbsw.messiofcoding.domain.auth.dto.response.LoginServiceResult;
+import com.gbsw.messiofcoding.domain.auth.dto.response.RefreshAccessTokenResponse;
 import com.gbsw.messiofcoding.domain.auth.dto.response.RegisterResponse;
 import com.gbsw.messiofcoding.domain.auth.entity.RefreshToken;
 import com.gbsw.messiofcoding.domain.auth.repository.RefreshTokenRepository;
@@ -11,6 +12,9 @@ import com.gbsw.messiofcoding.domain.users.repository.UserRepository;
 import com.gbsw.messiofcoding.global.exception.CustomException;
 import com.gbsw.messiofcoding.global.exception.ErrorCode;
 import com.gbsw.messiofcoding.global.security.jwt.JwtProperties;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import com.gbsw.messiofcoding.global.security.jwt.JwtProvider;
 import lombok.RequiredArgsConstructor;
@@ -65,7 +69,7 @@ public class AuthService {
         String refreshToken = jwtProvider.generateRefreshToken(user.getId());
 
         RefreshToken refreshTokenDB = RefreshToken.builder()
-                .token(refreshToken)
+                .token(hash(refreshToken))
                 .expiryDate(LocalDateTime.now().plusSeconds(jwtProperties.getRefreshTokenExpiration() / 1000))
                 .user(user)
                 .build();
@@ -78,7 +82,42 @@ public class AuthService {
     @Transactional
     public void logout(String refreshToken) {
         if (refreshToken != null) {
-            refreshTokenRepository.deleteByToken(refreshToken);
+            refreshTokenRepository.deleteByToken(hash(refreshToken));
+        }
+    }
+
+    @Transactional
+    public RefreshAccessTokenResponse refreshAcessToken(String refreshToken) {
+        if (refreshToken == null) {
+            throw new CustomException(ErrorCode.INVALID_REFRESH_TOKEN);
+        }
+
+        jwtProvider.validateToken(refreshToken);
+
+        RefreshToken refreshTokenDB = refreshTokenRepository.findByToken(hash(refreshToken))
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_REFRESH_TOKEN));
+
+        if (refreshTokenDB.getExpiryDate().isBefore(LocalDateTime.now())) {
+            refreshTokenRepository.delete(refreshTokenDB);
+            throw new CustomException(ErrorCode.EXPIRED_TOKEN);
+        }
+
+        String newAccessToken = jwtProvider.generateAccessToken(refreshTokenDB.getUser().getId());
+
+        return new RefreshAccessTokenResponse(newAccessToken);
+    }
+
+    private String hash(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : bytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
         }
     }
 }

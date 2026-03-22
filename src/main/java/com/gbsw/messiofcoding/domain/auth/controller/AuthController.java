@@ -4,6 +4,7 @@ import com.gbsw.messiofcoding.domain.auth.dto.request.LoginRequest;
 import com.gbsw.messiofcoding.domain.auth.dto.request.RegisterRequest;
 import com.gbsw.messiofcoding.domain.auth.dto.response.LoginResponse;
 import com.gbsw.messiofcoding.domain.auth.dto.response.LoginServiceResult;
+import com.gbsw.messiofcoding.domain.auth.dto.response.RefreshAccessTokenResponse;
 import com.gbsw.messiofcoding.domain.auth.dto.response.RegisterResponse;
 import com.gbsw.messiofcoding.domain.auth.service.AuthService;
 import com.gbsw.messiofcoding.global.security.jwt.JwtProperties;
@@ -46,6 +47,14 @@ public class AuthController {
         response.addCookie(cookie);
 
         return ResponseEntity.ok(ApiResponse.success(new LoginResponse(result.accessToken())));
+    }
+
+    @PostMapping("refresh-accesstoken")
+    public ResponseEntity<ApiResponse<RefreshAccessTokenResponse>> refreshAccessToken(
+            @CookieValue(name = "refreshToken", required = false) String refreshToken
+    ) {
+        RefreshAccessTokenResponse rs = authService.refreshAcessToken(refreshToken);
+        return ResponseEntity.ok(ApiResponse.success(rs));
     }
 
     @PostMapping("logout")
