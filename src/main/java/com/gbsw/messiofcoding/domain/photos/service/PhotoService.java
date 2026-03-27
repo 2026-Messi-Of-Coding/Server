@@ -7,32 +7,40 @@ import com.gbsw.messiofcoding.global.exception.CustomException;
 import com.gbsw.messiofcoding.global.exception.ErrorCode;
 import com.gbsw.messiofcoding.infra.s3.S3Service;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PhotoService {
     private final S3Service s3Service;
     private final PhotoRepository photoRepository;
 
+    @Transactional
     public PhotoUploadResponse upload(MultipartFile file, Long userId) {
         S3Service.S3UploadResult result = s3Service.upload(file, userId);
 
-        Photo photo = Photo.builder()
-                .userId(userId)
-                .s3Key(result.s3Key())
-                .imageUrl(result.imageUrl())
-                .build();
+        try {
+            Photo photo = Photo.builder()
+                    .userId(userId)
+                    .s3Key(result.s3Key())
+                    .imageUrl(result.imageUrl())
+                    .build();
 
-        Photo saved = photoRepository.save(photo);
+            Photo saved = photoRepository.save(photo);
 
-        return PhotoUploadResponse.from(saved);
+            return PhotoUploadResponse.from(saved);
+        } catch (Exception e) {
+            s3Service.delete(result.s3Key());
+            throw e;
+        }
     }
 
-    public void delete(UUID photoId, Long userId) {
+    @Transactional
+    public void delete(Long photoId, Long userId) {
         Photo photo = photoRepository.findById(photoId)
                 .orElseThrow(() -> new CustomException(ErrorCode.IMAGE_NOT_FOUND));
 
@@ -40,7 +48,9 @@ public class PhotoService {
             throw new CustomException(ErrorCode.ACCESS_DENIED);
         }
 
-        s3Service.delete(photo.getS3Key());
+        String s3Key = photo.getS3Key();
         photoRepository.delete(photo);
+        photoRepository.flush();
+        s3Service.delete(s3Key);
     }
 }
