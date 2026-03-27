@@ -8,7 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -32,23 +32,32 @@ public class S3Service {
 
     public S3UploadResult upload(MultipartFile file, Long userId) {
         validateImageFile(file);
+
+        if (userId == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
         String s3Key = generateS3Key(userId, file.getContentType());
 
-        try {
-            s3Uploader.upload(s3Key, file.getInputStream(), file.getContentType(), file.getSize());
-        } catch (IOException e) {
+        try (InputStream inputStream = file.getInputStream()) {
+            s3Uploader.upload(s3Key, inputStream, file.getContentType(), file.getSize());
+        } catch (Exception e) {
             throw new CustomException(ErrorCode.IMAGE_UPLOAD_FAILED);
         }
 
         String imageUrl = cloudfrontDomain + "/" + s3Key;
-        log.info("S3업로드 완료 - key{}", imageUrl);
+        log.info("S3업로드 완료 - key: {}", imageUrl);
 
         return new S3UploadResult(s3Key, imageUrl);
     }
 
     public void delete(String s3Key) {
-        s3Uploader.delete(s3Key);
-        log.info("S3 삭제 완료 - key: {}", s3Key);
+        try {
+            s3Uploader.delete(s3Key);
+            log.info("S3 삭제 완료 - key: {}", s3Key);
+        } catch (Exception e) {
+            throw new CustomException(ErrorCode.IMAGE_DELETE_FAILED);
+        }
     }
 
     private String generateS3Key(Long userId, String contentType) {
